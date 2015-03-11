@@ -1,22 +1,22 @@
 /*
 
-    Copyright (C) 2015 Héctor Condori Alagón.
+ Copyright (C) 2015 Héctor Condori Alagón.
 
-    This file is part of ALN, the massive Smith-Waterman pairwise aligner.
+ This file is part of ALN, the massive Smith-Waterman pairwise aligner.
 
-    ALN is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+ ALN is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
 
-    Foobar is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+ Foobar is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ You should have received a copy of the GNU General Public License
+ along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #define _GNU_SOURCE
 
@@ -49,11 +49,11 @@
 
 queue* q;
 
-pthread_mutex_t queue_mutex;
-pthread_mutex_t print_mutex;
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_cond_t not_empty_cond;
-pthread_cond_t need_refill_cond;
+pthread_cond_t not_empty_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t need_refill_cond = PTHREAD_COND_INITIALIZER;
 
 int more_batches = 1;
 int do_int = 0;
@@ -66,7 +66,8 @@ FILE* seqs1_file;
 FILE* seqs2_file;
 FILE* out_file;
 
-float gap_open = 10.0f, gap_extend = 0.5f;	//default values
+float gap_open = 10.0f,
+gap_extend = 0.5f;	//default values
 int gap_open_i = 10.0, gap_extend_i = 1;	//default values
 float* sm;
 int* smi;
@@ -125,8 +126,10 @@ consumer (void* ptr)
       if (do_float)
 	{
 	  alns = pw_aligner (batch->seqs1_ids, batch->seqs2_ids, batch->seqs1,
-			     batch->seqs2, sm, gap_open, gap_extend, 0);
-	  //alns = avx2_sw_f32_with_match (seqs1, seqs2, 5, -4, gap_open, gap_extend);
+	  batch->seqs2, sm, gap_open, gap_extend, 0);
+	  /*alns = avx2_sw_f32_with_match (batch->seqs1_ids, batch->seqs2_ids,
+					 batch->seqs1, batch->seqs2, 5, -4,
+					 gap_open, gap_extend, 0);*/
 
 	  for (int i = 0; i < batch->pair_count; i++)
 	    {
@@ -409,6 +412,7 @@ main (int argc, char** argv)
   printf ("Aln version 0.0\n");
   printf ("===============\n\n");
 
+  int has_sse41 = __builtin_cpu_supports ("sse4.1");
   int has_avx = __builtin_cpu_supports ("avx");
   int has_avx2 = __builtin_cpu_supports ("avx2");
 
@@ -424,6 +428,10 @@ main (int argc, char** argv)
 	  printf (" * AVX support detected.\n");
 	  pw_aligner = &avx_sw_f32_with_matrix;
 	}
+      else if (has_sse41)
+      	{
+      	  printf (" * SSE 4.1 support detected.\n");
+      	}
       else
 	{
 	  printf (" * No AVX support found. Using SISD version.");
@@ -489,11 +497,6 @@ main (int argc, char** argv)
 
   q = new_queue ();
   aln_batch* batch;
-
-  pthread_mutex_init (&queue_mutex, NULL);
-  pthread_mutex_init (&print_mutex, NULL);
-  pthread_cond_init (&need_refill_cond, NULL);
-  pthread_cond_init (&not_empty_cond, NULL);
 
   pthread_t consumers[jobs];
   for (int i = 0; i < jobs; i++)
