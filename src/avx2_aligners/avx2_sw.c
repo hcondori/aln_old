@@ -1,22 +1,22 @@
 /*
 
-    Copyright (C) 2015 Héctor Condori Alagón.
+ Copyright (C) 2015 Héctor Condori Alagón.
 
-    This file is part of ALN, the massive Smith-Waterman pairwise aligner.
+ This file is part of ALN, the massive Smith-Waterman pairwise sequence aligner.
 
-    ALN is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+ ALN is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
 
-    Foobar is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+ ALN is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ You should have received a copy of the GNU General Public License
+ along with ALN.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 
 #include "../avx2_aligners/avx2_sw.h"
@@ -381,8 +381,8 @@ avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
  */
 
 alignment_f32*
-avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
-			char** seqs2, float match, float mismatch,
+avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
+			char* seqs2[8], float match, float mismatch,
 			float gap_open, float gap_extend, int dup_strings)
 {
   int max_i = 0;
