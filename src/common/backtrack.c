@@ -49,7 +49,7 @@ sw_backtrack (int index, int* flags, const char* a, const char* b, int w, int h,
 
   int c = 0;
 
-  while ((flags[x * h + y] & d_mask) && x > 1 && y > 1)
+  while ((flags[x * h + y] & d_mask))
     {
       if ((flags[x * h + y] & d_mask) == d_mask)
 	{
