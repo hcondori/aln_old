@@ -49,8 +49,8 @@ avx2_fill_table_8_to_8_i32 (int* seqs1, int* seqs2, int x, int y,
   __m256i c_up, c_left, b_up, b_left, H_eq_diag, H_eq_E, H_eq_F, H_ne_E;
   int flag, h_eq_d, h_eq_e, h_ne_e, h_eq_f, h_gt_0;
 
-  float* aF = (float*) aligned_alloc (32, 8 * y * sizeof(float));
-  float* aH = (float*) aligned_alloc (32, 8 * y * sizeof(float));
+  int* aF = (int*) aligned_alloc (32, 8 * y * sizeof(int));
+  int* aH = (int*) aligned_alloc (32, 8 * y * sizeof(int));
   int* bt_flag = (int*) malloc (x * y * sizeof(int));
   //if we are sure that sequences will be small, we keep them in the stack
   //float aF[8 * y] __attribute__((aligned(32)));
