@@ -117,15 +117,6 @@ sw_1_to_1_f32_mith_matrix (char* seq1, char* seq2, float* subs_matrix,
   return alignment;
 }
 
-void
-avx2_fill_table_1_to_m_f32 (int* bt_flag, char* query, char** refs,
-			    int ref_count, int x, int y, float* subs_matrix,
-			    float gap_open, float gap_extend, float* max_score,
-			    int* ipos, int* jpos)
-{
-
-}
-
 /*
  *Core function.
  *
@@ -133,11 +124,12 @@ avx2_fill_table_1_to_m_f32 (int* bt_flag, char* query, char** refs,
 void
 avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 			   float* subs_matrix, float gap_open, float gap_extend,
-			   float* max_score, int* ipos, int* jpos)
+			   float max_score[8], int ipos[8], int jpos[8])
 {
   int mask = 0x7FFFFFFF;
   __m256 vmask = _mm256_castsi256_ps (_mm256_set1_epi32 (mask));
   __m256i s1, s2, temp_index, index;
+  __m256i v128 = _mm256_set1_epi32 (128);
   __m256 vopen = _mm256_set1_ps (gap_open);
   __m256 vextend = _mm256_set1_ps (gap_extend);
   __m256 vzero = _mm256_setzero_ps ();
@@ -150,7 +142,7 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
   __m256 F, F_sub;
   __m256 diag, score, H, H_diag, H_left, temp;
   __m256 c_up, c_left, b_up, b_left, H_eq_diag, H_eq_E, H_eq_F, H_ne_E;
-  int flag, h_eq_d, h_eq_e, h_ne_e, h_eq_f, h_gt_0, test;
+  int flag, h_eq_d, h_eq_e, h_ne_e, h_eq_f, h_gt_0;
 
   float buffer[8] __attribute__((aligned(32)));
   int buffer_i[8] __attribute__((aligned(32)));
@@ -163,8 +155,7 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
   //float aH[8 * y] __attribute__((aligned(32)));
 
   memset (aH, 0, 8 * y * sizeof(float));
-  memset (ipos, 0, 8 * sizeof(int));
-  memset (jpos, 0, 8 * sizeof(int));
+  memset (bt_flag, 0, y * sizeof(int));
 
   for (int i = 0; i < 8 * y; i++)
     {
@@ -173,10 +164,10 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 
   for (int i = 1; i < x; i++)
     {
-
       E = _mm256_set1_ps (-FLT_MAX);
       H_diag = _mm256_setzero_ps ();
       H = _mm256_setzero_ps ();
+      bt_flag[i * y] = 0;
       for (int j = 1; j < y; j++)
 	{
 	  for (int k = 0; k < 8; k++)
@@ -184,11 +175,10 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 	      buffer[k] = subs_matrix[128 * (*(seqs1 + 8 * (i - 1) + k))
 		  + *(seqs2 + 8 * (j - 1) + k)];
 	    }
-
 	  score = _mm256_load_ps (buffer);
-
 	  H_left = _mm256_load_ps (aH + 8 * j);
 	  diag = _mm256_add_ps (H_diag, score);
+	  H_diag = H_left;
 
 	  E_sub = _mm256_sub_ps (E, vextend);	//for now, E is E_up
 	  E = _mm256_sub_ps (H, vopen);		//for now, H is H_up
@@ -206,16 +196,22 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 	  _mm256_store_ps (aH + 8 * j, H);
 
 	  //logic tests
-	  h_gt_0 = _mm256_movemask_ps (_mm256_cmp_ps(H, vzero, _CMP_GT_OQ));
-	  H_eq_E = _mm256_cmp_ps(H, E, _CMP_EQ_OQ);
+
+	  diff = _mm256_sub_ps (H, vzero);
+	  h_gt_0 = _mm256_movemask_ps (
+	      _mm256_cmp_ps(diff, vepsilon, _CMP_GT_OQ));
+	  diff = _mm256_sub_ps (H, E);
+	  diff = _mm256_and_ps (diff, vmask);	//absolute value
+	  H_eq_E = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
 	  h_eq_e = _mm256_movemask_ps (H_eq_E);
-	  H_eq_F = _mm256_cmp_ps(H, F, _CMP_EQ_OQ);
+	  diff = _mm256_sub_ps (H, F);
+	  diff = _mm256_and_ps (diff, vmask);	//absolute value
+	  H_eq_F = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
 	  h_eq_f = _mm256_movemask_ps (H_eq_F);
 
 	  //********FLAGS********
 	  diff = _mm256_sub_ps (E, E_sub);
 	  diff = _mm256_and_ps (diff, vmask);	//absolute value
-
 	  c_up = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // E[i,j] == E[i,j-1]-gap_extent ?
 	  flag = _mm256_movemask_ps (c_up); // & h_eq_e;		//c_up
 
@@ -238,10 +234,10 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 
 	  bt_flag[y * i + j] = flag;
 
-	  temp = _mm256_cmp_ps(H, max, _CMP_GT_OQ);
-	  //test = _mm256_movemask_ps (temp);
-	  _mm256_store_ps (buffer, temp);
+	  diff = _mm256_sub_ps (H, max);
+	  temp = _mm256_cmp_ps(diff, vepsilon, _CMP_GT_OQ);
 
+	  _mm256_store_ps (buffer, temp);
 	  for (int k = 0; k < 8; k++)
 	    {
 	      if (buffer[k])
@@ -250,9 +246,7 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 		  jpos[k] = j;
 		}
 	    }
-
 	  max = _mm256_max_ps (H, max);
-	  H_diag = H_left;
 	}
     }
   _mm256_store_ps (max_score, max);
@@ -260,13 +254,15 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
   free (aH);
 }
 
+
+
 alignment_f32*
-avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
-			char** seqs2, float* subs_matrix, float gap_open,
+avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
+			char* seqs2[8], float* subs_matrix, float gap_open,
 			float gap_extend, int dup_strings)
 {
-  int max_i = 0;
-  int max_j = 0;
+  int max_i;
+  int max_j;
 
   int lens_i[8];
   int lens_j[8];
@@ -280,7 +276,8 @@ avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
   int* packed_seqs1 = avx_pack_8_seqs_with_len (seqs1, lens_i, &max_i);
   int* packed_seqs2 = avx_pack_8_seqs_with_len (seqs2, lens_j, &max_j);
 
-  int* flags = (int*) malloc (sizeof(int) * (max_i + 1) * (max_j + 1));
+  //int* flags = (int*) malloc ((max_i + 1) * (max_j + 1) * sizeof(int));
+  int* flags = (int*) malloc ((max_i + 1) * (max_j + 1) * sizeof(int));
 
   float max_score[8] __attribute__((aligned(32)));
   int pos_i[8] __attribute__((aligned(32)));
@@ -297,17 +294,22 @@ avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
 
   for (int i = 0; i < 8; i++)
     {
-      char* m = (char*) calloc ((max_i + max_j + 1), sizeof(char));
+      //assert(max_i + max_j + 1 > 0);
+      char* m = (char*) calloc ((max_i + max_j + 1), sizeof(char));//worst-case length
       char* n = (char*) calloc ((max_i + max_j + 1), sizeof(char));
+
+      //assert(m != NULL);
+      //assert(n != NULL);
 
       sw_backtrack (i, flags, seqs1[i], seqs2[i], max_i + 1, max_j + 1, m, n,
 		    pos_i[i], pos_j[i], &x0, &y0);
+      //assert(strlen (m) == strlen (n));
 
       int new_len = strlen (m) + 1;
 
       //adjusting to actual sizes
-      //m = (char*) realloc (m, new_len * sizeof(char));
-      //n = (char*) realloc (n, new_len * sizeof(char));
+      m = (char*) realloc (m, new_len * sizeof(char));
+      n = (char*) realloc (n, new_len * sizeof(char));
 
       if (dup_strings)
 	{
@@ -334,6 +336,7 @@ avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
       alignments[i].aln_y = pos_j[i];
       alignments[i].score = max_score[i];
     }
+
   free (packed_seqs1);
   free (packed_seqs2);
   free (flags);
