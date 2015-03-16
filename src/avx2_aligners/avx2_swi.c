@@ -61,7 +61,7 @@ avx2_fill_table_8_to_8_i32 (int* seqs1, int* seqs2, int x, int y,
 
   for (int i = 0; i < 8 * y; i++)
     {
-      aF[i] = -FLT_MAX;
+      aF[i] = -1000;
     }
 
   for (int i = 1; i < x; i++)
@@ -79,6 +79,7 @@ avx2_fill_table_8_to_8_i32 (int* seqs1, int* seqs2, int x, int y,
 	  score = _mm256_i32gather_epi32(subs_matrix, index, 4);
 	  H_left = _mm256_load_si256 ((__m256i *) (aH + 8 * j));
 	  diag = _mm256_add_epi32 (H_diag, score);
+	  H_diag = H_left;
 
 	  E_sub = _mm256_sub_epi32 (E, vextend);	//for now, E is E_up
 	  E = _mm256_sub_epi32 (H, vopen);		//for now, H is H_up
@@ -130,7 +131,6 @@ avx2_fill_table_8_to_8_i32 (int* seqs1, int* seqs2, int x, int y,
 	  jmax = _mm256_blendv_epi8 (jmax, _mm256_set1_epi32 (j), temp);
 	  max = _mm256_max_epi32 (H, max);
 
-	  H_diag = H_left;
 	}
     }
   _mm256_store_si256 ((__m256i *) max_score, max);
@@ -267,7 +267,7 @@ avx2_fill_table_8_to_8_i32_with_match (int* seqs1, int* seqs2, int x, int y,
  *Core function.
  *
  */
-alignment_i32*
+alignment*
 avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			 char* seqs2[8], int* subs_matrix, int gap_open,
 			 int gap_extend, int dup_strings)
@@ -296,8 +296,8 @@ avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 					   gap_open, gap_extend, max_score,
 					   pos_i, pos_j);
 
-  alignment_i32* alignments = (alignment_i32*) malloc (
-      8 * sizeof(alignment_i32));
+  alignment* alignments = (alignment*) malloc (
+      8 * sizeof(alignment));
 
   int x0, y0;
 
@@ -343,7 +343,8 @@ avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
       alignments[i].aln_y0 = y0;
       alignments[i].aln_x = pos_i[i];
       alignments[i].aln_y = pos_j[i];
-      alignments[i].score = max_score[i];
+      alignments[i].score.i32 = max_score[i];
+      alignments[i].type= ALN_SCORE_INT32;
     }
 
   free (packed_seqs1);
@@ -352,7 +353,7 @@ avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
   return alignments;
 }
 
-alignment_i32*
+alignment*
 avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], int match, int mismatch, int gap_open,
 			int gap_extend, int dup_strings)
@@ -383,8 +384,8 @@ avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 						      gap_extend, max_score,
 						      pos_i, pos_j);
 
-  alignment_i32* alignments = (alignment_i32*) malloc (
-      8 * sizeof(alignment_i32));
+  alignment* alignments = (alignment*) malloc (
+      8 * sizeof(alignment));
 
   int x0, y0;
 
@@ -430,7 +431,8 @@ avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
       alignments[i].aln_y0 = y0;
       alignments[i].aln_x = pos_i[i];
       alignments[i].aln_y = pos_j[i];
-      alignments[i].score = max_score[i];
+      alignments[i].score.i32 = max_score[i];
+      alignments[i].type= ALN_SCORE_INT32;
     }
 
   free (packed_seqs1);

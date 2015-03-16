@@ -50,30 +50,30 @@
 queue* q;
 
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_cond_t not_empty_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t need_refill_cond = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t not_empty_cond = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t need_refill_cond = PTHREAD_COND_INITIALIZER;
 
-int more_batches = 1;
-int do_int = 0;
-int do_float = 1;
+    int more_batches = 1;
+    int do_int = 0;
+    int do_float = 1;
 
-char* seqs1_fname = NULL;
-char* seqs2_fname = NULL;
-char* out_fname = NULL;
-FILE* seqs1_file;
-FILE* seqs2_file;
-FILE* out_file;
+    char* seqs1_fname = NULL;
+    char* seqs2_fname = NULL;
+    char* out_fname = NULL;
+    FILE* seqs1_file;
+    FILE* seqs2_file;
+    FILE* out_file;
 
-float gap_open = 10.0f,
+    float gap_open = 10.0f,
 gap_extend = 0.5f;	//default values
 int gap_open_i = 10.0, gap_extend_i = 1;	//default values
 float* sm;
 int* smi;
 
 //pointer to pairwise aligner
-alignment_f32*
+alignment*
 (*pw_aligner) (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 	       char* seqs2[8], float* subs_matrix, float gap_open,
 	       float gap_extend, int dup_strings);
@@ -100,8 +100,7 @@ aln_batch_shallow_free (aln_batch* batch)
 void*
 consumer (void* ptr)
 {
-  alignment_f32* alns;
-  alignment_i32* i32_alns;
+  alignment* alns;
 
   aln_batch* batch = NULL;
 
@@ -126,39 +125,38 @@ consumer (void* ptr)
       if (do_float)
 	{
 	  alns = pw_aligner (batch->seqs1_ids, batch->seqs2_ids, batch->seqs1,
-	  batch->seqs2, sm, gap_open, gap_extend, 0);
+			     batch->seqs2, sm, gap_open, gap_extend, 0);
 	  /*alns = avx2_sw_f32_with_match (batch->seqs1_ids, batch->seqs2_ids,
-					 batch->seqs1, batch->seqs2, 5, -4,
-					 gap_open, gap_extend, 0);*/
+	   batch->seqs1, batch->seqs2, 5, -4,
+	   gap_open, gap_extend, 0);*/
 
 	  for (int i = 0; i < batch->pair_count; i++)
 	    {
 	      pthread_mutex_lock (&print_mutex);
-	      print_alignment_f32 (out_file, &alns[i]);
+	      print_alignment (out_file, &alns[i]);
 	      pthread_mutex_unlock (&print_mutex);
 	    }
 	  for (int i = 0; i < 8; i++)
-	    alignment_f32_free (&alns[i]);
+	    alignment_free (&alns[i]);
 	  free (alns);
 	}
       else
 	{
-	  /*i32_alns = avx2_sw_i32_with_matrix (batch->seqs1_ids,
-	   batch->seqs2_ids, batch->seqs1,
-	   batch->seqs2, smi, gap_open_i,
-	   gap_extend_i, 0);*/
-	  i32_alns = avx2_sw_i32_with_match (batch->seqs1_ids, batch->seqs2_ids,
-					     batch->seqs1, batch->seqs2, 5, -4,
-					     gap_open_i, gap_extend_i, 0);
+	  alns = avx2_sw_i32_with_matrix (batch->seqs1_ids, batch->seqs2_ids,
+					  batch->seqs1, batch->seqs2, smi,
+					  gap_open_i, gap_extend_i, 0);
+	  /*i32_alns = avx2_sw_i32_with_match (batch->seqs1_ids, batch->seqs2_ids,
+	   batch->seqs1, batch->seqs2, 5, -4,
+	   gap_open_i, gap_extend_i, 0);*/
 	  for (int i = 0; i < batch->pair_count; i++)
 	    {
 	      pthread_mutex_lock (&print_mutex);
-	      print_alignment_i32 (out_file, &i32_alns[i]);
+	      print_alignment (out_file, &alns[i]);
 	      pthread_mutex_unlock (&print_mutex);
 	    }
 	  for (int i = 0; i < 8; i++)
-	    alignment_i32_free (&i32_alns[i]);
-	  free (i32_alns);
+	    alignment_free (&alns[i]);
+	  free (alns);
 	}
       aln_batch_shallow_free (batch);
       batch = NULL;
@@ -415,6 +413,7 @@ main (int argc, char** argv)
   int has_sse41 = __builtin_cpu_supports ("sse4.1");
   int has_avx = __builtin_cpu_supports ("avx");
   int has_avx2 = __builtin_cpu_supports ("avx2");
+  //has_avx2 = 0;
 
   if (platform == 0)
     {
@@ -429,9 +428,9 @@ main (int argc, char** argv)
 	  pw_aligner = &avx_sw_f32_with_matrix;
 	}
       else if (has_sse41)
-      	{
-      	  printf (" * SSE 4.1 support detected.\n");
-      	}
+	{
+	  printf (" * SSE 4.1 support detected.\n");
+	}
       else
 	{
 	  printf (" * No AVX or SSE support found. Using SISD version.");
@@ -492,8 +491,6 @@ main (int argc, char** argv)
   int state2 = 0;
   char ch1;
   char ch2;
-
-  //has_avx2 = 0;
 
   q = new_queue ();
   aln_batch* batch;

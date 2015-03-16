@@ -46,7 +46,6 @@ avx2_fill_table_8_to_8_i8 (int* seqs1, int* seqs2, int x, int y,
   __m256i vopen = _mm256_set1_epi32 (gap_open);
   __m256i vextend = _mm256_set1_epi32 (gap_extend);
   __m256i vzero = _mm256_setzero_si256 ();
-  __m256i vepsilon = _mm256_set1_epi32 (EPSILON);
   __m256i imax = _mm256_setzero_si256 ();
   __m256i jmax = _mm256_setzero_si256 ();
   __m256i max = _mm256_setzero_si256 ();
@@ -276,7 +275,7 @@ avx2_fill_table_1_to_32_i8 (int* seqs1, int* seqs2, int x, int y,
  *
  */
 alignment_i32*
-avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
+avx2_sw_i8_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			 char* seqs2[8], int* subs_matrix, int gap_open,
 			 int gap_extend, int dup_strings)
 {

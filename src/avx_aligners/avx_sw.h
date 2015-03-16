@@ -29,11 +29,11 @@ prepare_table (int x, int y, float o, float e);
 float*
 extract_table (float* table, int x, int y, int n);
 
-alignment_f32*
+alignment*
 sw_1_to_1_f32_mith_matrix (char* seq1, char* seq2, float* subs_matrix,
 			   float gap_open, float gap_extend);
 
-alignment_f32*
+alignment*
 avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
 			char** seqs2, float* subs_matrix, float gap_open,
 			float gap_extend, int dup_strings);

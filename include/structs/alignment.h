@@ -18,11 +18,24 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef ALIGNMENT_H_
 #define ALIGNMENT_H_
 
 #include <stdio.h>
+#include <stdint.h>
+
+typedef enum
+{
+  ALN_SCORE_INT8, ALN_SCORE_INT16, ALN_SCORE_INT32, ALN_SCORE_FLOAT32
+} aln_score_type;
+
+typedef union
+{
+  int8_t i8;
+  int16_t i16;
+  int32_t i32;
+  float f32;
+} aln_score;
 
 typedef struct
 {
@@ -39,37 +52,14 @@ typedef struct
   int aln_y0;
   int aln_x;
   int aln_y;
-  float score;
-} alignment_f32;
-
-typedef struct
-{
-  char* seq1_id;
-  char* seq2_id;
-  char* seq1;
-  char* seq2;
-  int seq1_len;
-  int seq2_len;
-  char* aln1;
-  char* aln2;
-  int aln_len;
-  int aln_x0;
-  int aln_y0;
-  int aln_x;
-  int aln_y;
-  int score;
-} alignment_i32;
+  aln_score score;
+  aln_score_type type;
+} alignment;
 
 void
-alignment_i32_free (alignment_i32* aln);
+alignment_free (alignment* aln);
 
 void
-alignment_f32_free (alignment_f32* aln);
-
-void
-print_alignment_f32 (FILE *f, alignment_f32* aln);
-
-void
-print_alignment_i32 (FILE *f, alignment_i32* aln);
+print_alignment (FILE *f, alignment* aln);
 
 #endif /* ALIGNMENT_H_ */

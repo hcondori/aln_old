@@ -19,7 +19,7 @@
  */
 
 
-#include "../avx2_aligners/avx2_sw.h"
+#include "avx2_sw.h"
 
 /*
  *Core function.
@@ -78,6 +78,7 @@ avx2_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 	  score = _mm256_i32gather_ps(subs_matrix, index, 4);
 	  H_left = _mm256_load_ps (aH + 8 * j);
 	  diag = _mm256_add_ps (H_diag, score);
+	  H_diag = H_left;
 
 	  E_sub = _mm256_sub_ps (E, vextend);	//for now, E is E_up
 	  E = _mm256_sub_ps (H, vopen);		//for now, H is H_up
@@ -142,7 +143,6 @@ avx2_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 				     _mm256_castps_si256 (temp));
 	  max = _mm256_max_ps (H, max);
 
-	  H_diag = H_left;
 	}
     }
   _mm256_store_ps (max_score, max);
@@ -288,7 +288,7 @@ avx2_fill_table_8_to_8_f32_with_match (int* bt_flag, int* seqs1, int* seqs2,
  * This function accepts a susbstitution matrix
  */
 
-alignment_f32*
+alignment*
 avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			 char* seqs2[8], float* subs_matrix, float gap_open,
 			 float gap_extend, int dup_strings)
@@ -319,8 +319,8 @@ avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			      max_j + 1, subs_matrix, gap_open, gap_extend,
 			      max_score, pos_i, pos_j);
 
-  alignment_f32* alignments = (alignment_f32*) malloc (
-      8 * sizeof(alignment_f32));
+  alignment* alignments = (alignment*) malloc (
+      8 * sizeof(alignment));
 
   int x0, y0;
 
@@ -366,7 +366,8 @@ avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
       alignments[i].aln_y0 = y0;
       alignments[i].aln_x = pos_i[i];
       alignments[i].aln_y = pos_j[i];
-      alignments[i].score = max_score[i];
+      alignments[i].score.f32 = max_score[i];
+      alignments[i].type= ALN_SCORE_FLOAT32;
     }
 
   free (packed_seqs1);
@@ -380,7 +381,7 @@ avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
  * This function accepts a susbstitution matrix
  */
 
-alignment_f32*
+alignment*
 avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], float match, float mismatch,
 			float gap_open, float gap_extend, int dup_strings)
@@ -412,8 +413,8 @@ avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 					 gap_open, gap_extend, max_score, pos_i,
 					 pos_j);
 
-  alignment_f32* alignments = (alignment_f32*) malloc (
-      8 * sizeof(alignment_f32));
+  alignment* alignments = (alignment*) malloc (
+      8 * sizeof(alignment));
 
   int x0, y0;
 
@@ -454,7 +455,8 @@ avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
       alignments[i].aln_y0 = y0;
       alignments[i].aln_x = pos_i[i];
       alignments[i].aln_y = pos_j[i];
-      alignments[i].score = max_score[i];
+      alignments[i].score.f32 = max_score[i];
+      alignments[i].type= ALN_SCORE_FLOAT32;
     }
 
   free (packed_seqs1);

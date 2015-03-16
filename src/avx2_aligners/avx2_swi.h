@@ -22,12 +22,12 @@
 #ifndef AVX2_SWI_H_
 #define AVX2_SWI_H_
 
-alignment_i32*
+alignment*
 avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			 char* seqs2[8], int* subs_matrix, int gap_open,
 			 int gap_extend, int dup_strings);
 
-alignment_i32*
+alignment*
 avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], int match, int mismatch, int gap_open,
 			int gap_extend, int dup_strings);

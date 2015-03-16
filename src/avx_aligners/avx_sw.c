@@ -29,95 +29,6 @@
 #include "common/utils.h"
 
 /*
- * Simple Smith-Waterman implementation for compatibility with old processors.
- */
-alignment_f32*
-sw_1_to_1_f32_mith_matrix (char* seq1, char* seq2, float* subs_matrix,
-			   float gap_open, float gap_extend)
-{
-  int w = strlen (seq1) + 1;
-  int h = strlen (seq2) + 1;
-
-  float diagonal, E, E_sub, F, F_sub, H, H_left, H_diag;
-  float* aF = (float*) malloc (h * sizeof(float));
-  for (int i = 0; i < h; i++)
-    {
-      aF[i] = -FLT_MAX;
-    }
-  float* aH = (float*) calloc (h, sizeof(float));
-
-  int flag;
-  int *flags = (int*) malloc (h * w * sizeof(int));
-
-  float max = 0;
-  int x = 0, y = 0;
-
-  for (int i = 1; i < w; i++)
-    {
-      E = -FLT_MAX;
-      H = 0;
-      H_diag = 0;
-      for (int j = 1; j < h; j++)
-	{
-	  H_left = aH[j];
-	  F_sub = aF[j];
-	  diagonal = H_diag + subs_matrix[seq1[i - 1] * 128 + seq2[j - 1]];
-
-	  E_sub = E - gap_extend;
-	  E = H - gap_open;
-	  E = MAX(E, E_sub);
-
-	  F_sub = F_sub - gap_extend;
-	  F = H_left - gap_open;
-	  F = MAX(F, F_sub);
-	  aF[j] = F;
-
-	  H = MAX(E, F);
-	  H = MAX(H, diagonal);
-	  H = MAX(H, 0);
-	  aH[j] = H;
-	  H_diag = H_left;
-
-	  if (H > max)
-	    {
-	      max = H;
-	      x = i;
-	      y = j;
-	    }
-
-	  //flags
-	  flag = (E == E_sub) ? 1 : 0; //c_up
-	  flag <<= 8;
-	  flag += (F == F_sub) ? 1 : 0; //c_left
-	  flag <<= 8;
-	  flag += ((H == E || H == diagonal) && H > 0) ? 1 : 0; //b_up
-	  flag <<= 8;
-	  flag += (((H == F && H != E) || H == diagonal) && H > 0) ? 1 : 0; //b_left
-	  flags[i * w + j] = flag;
-	}
-    }
-  char* aln1 = (char*) calloc (w + h - 1, sizeof(char));
-  char* aln2 = (char*) calloc (w + h - 1, sizeof(char));
-  int x0, y0;
-  sw_backtrack (0, flags, seq1, seq2, w, h, aln1, aln2, x, y, &x0, &y0);
-  alignment_f32* alignment = (alignment_f32*) malloc (sizeof(alignment_f32));
-
-  alignment->aln1 = seq1;
-  alignment->aln2 = seq2;
-  alignment->seq1_len = w - 1;
-  alignment->seq2_len = h - 1;
-  alignment->aln1 = aln1;
-  alignment->aln2 = aln2;
-  alignment->aln_len = strlen (aln1);
-  alignment->aln_x0 = x0;
-  alignment->aln_y0 = y0;
-  alignment->aln_x = x;
-  alignment->aln_y = y;
-  alignment->score = max;
-  return alignment;
-}
-
-/*
  *Core function.
  *
  */
@@ -256,7 +167,7 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 
 
 
-alignment_f32*
+alignment*
 avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], float* subs_matrix, float gap_open,
 			float gap_extend, int dup_strings)
@@ -287,8 +198,8 @@ avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			     max_j + 1, subs_matrix, gap_open, gap_extend,
 			     max_score, pos_i, pos_j);
 
-  alignment_f32* alignments = (alignment_f32*) malloc (
-      8 * sizeof(alignment_f32));
+  alignment* alignments = (alignment*) malloc (
+      8 * sizeof(alignment));
 
   int x0, y0;
 
@@ -334,7 +245,8 @@ avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
       alignments[i].aln_y0 = y0;
       alignments[i].aln_x = pos_i[i];
       alignments[i].aln_y = pos_j[i];
-      alignments[i].score = max_score[i];
+      alignments[i].score.f32 = max_score[i];
+      alignments[i].type = ALN_SCORE_FLOAT32;
     }
 
   free (packed_seqs1);

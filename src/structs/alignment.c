@@ -18,7 +18,6 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,18 +30,7 @@
  * Frees resources related to this structure.
  */
 void
-alignment_f32_free (alignment_f32* aln)
-{
-  free (aln->seq1_id);
-  free (aln->seq2_id);
-  free (aln->seq1);
-  free (aln->seq2);
-  free (aln->aln1);
-  free (aln->aln2);
-}
-
-void
-alignment_i32_free (alignment_i32* aln)
+alignment_free (alignment* aln)
 {
   free (aln->seq1_id);
   free (aln->seq2_id);
@@ -70,7 +58,7 @@ gen_aln (int len, char* aln1, char* aln2, char* matches, int* gaps)
 }
 
 void
-print_alignment_f32 (FILE *f, alignment_f32* aln)
+print_alignment (FILE *f, alignment* aln)
 {
   int wrap = 50;
   int gaps;
@@ -87,7 +75,23 @@ print_alignment_f32 (FILE *f, alignment_f32* aln)
   fprintf (f, "# Length: %d\n", aln->aln_len);
   fprintf (f, "# Gaps:     %d/%d (%.1f%%)\n", gaps, aln->aln_len,
 	   ((float) gaps / (float) aln->aln_len) * 100);
-  fprintf (f, "# Score:    %.1f\n\n\n", aln->score);
+  switch (aln->type)
+    {
+    case ALN_SCORE_INT8:
+      fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i8);
+      break;
+    case ALN_SCORE_INT16:
+      fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i16);
+      break;
+    case ALN_SCORE_INT32:
+      fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i32);
+      break;
+    case ALN_SCORE_FLOAT32:
+      fprintf (f, "# Score:    %0.1f\n\n\n", aln->score.f32);
+      break;
+    default:
+      break;
+    }
   fprintf (f, "#=======================================\n\n\n");
 
   int len = aln->aln_len;
@@ -95,25 +99,30 @@ print_alignment_f32 (FILE *f, alignment_f32* aln)
 
   for (int i = 0; i < n; i++)
     {
+      //fprintf (f, "1:   %4d ", aln->aln_x0 + wrap * i);
       fprintf (f, "1: ");
       for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
 	{
 	  fputc_unlocked (aln->aln1[j], f);
 	}
-      fputc ('\n', f);
-      fprintf (f, "   ", aln->score);
+      fputc_unlocked ('\n', f);
+      //fprintf (f, " %4d\n", aln->aln_x0 + MIN(wrap * (i + 1), len));
+      //fprintf (f, "          ");
+      fprintf (f, "   ");
       for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
 	{
 	  fputc_unlocked (matches[j], f);
 	}
-      fputc ('\n', f);
+      fputc_unlocked ('\n', f);
+      //fprintf (f, "1:   %4d ", aln->aln_y0 + wrap * i);
       fprintf (f, "2: ");
       for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
 	{
 	  fputc_unlocked (aln->aln2[j], f);
 	}
-      fputc ('\n', f);
-      fputc ('\n', f);
+      //fprintf (f, " %4d\n", aln->aln_y0 + MIN(wrap * (i + 1), len));
+      fputc_unlocked ('\n', f);
+      fputc_unlocked ('\n', f);
     }
 
   /*
@@ -125,57 +134,3 @@ print_alignment_f32 (FILE *f, alignment_f32* aln)
 
   free (matches);
 }
-
-void
-print_alignment_i32 (FILE *f, alignment_i32* aln)
-{
-  int wrap = 50;
-  int gaps;
-  char* matches = (char*) malloc ((aln->aln_len + 1) * sizeof(char));
-  matches[aln->aln_len] = '\0';
-  gen_aln (aln->aln_len, aln->aln1, aln->aln2, matches, &gaps);
-
-  fprintf (f, "#=======================================\n");
-
-  fprintf (f, "# 1: %s\n", aln->seq1_id);
-  fprintf (f, "# 2: %s\n", aln->seq2_id);
-  fprintf (f, "%d\n", aln->aln_x);
-  fprintf (f, "%d\n", aln->aln_y);
-
-  fprintf (f, "# Length: %d\n", aln->aln_len);
-  fprintf (f, "# Gaps:     %d/%d (%.1f%%)\n", gaps, aln->aln_len,
-	   ((float) gaps / (float) aln->aln_len) * 100);
-  fprintf (f, "# Score:    %d.0\n\n\n", aln->score);
-  fprintf (f, "#=======================================\n\n\n");
-
-  int len = aln->aln_len;
-  int n = (len + wrap - 1) / wrap;
-
-  for (int i = 0; i < n; i++)
-    {
-      fprintf (f, "1: ");
-      for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
-	{
-	  fputc_unlocked (aln->aln1[j], f);
-	}
-      fputc ('\n', f);
-      fprintf (f, "   ", aln->score);
-      for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
-	{
-	  fputc_unlocked (matches[j], f);
-	}
-      fputc ('\n', f);
-      fprintf (f, "2: ");
-      for (int j = i * wrap; j < MIN(wrap * (i + 1), len); j++)
-	{
-	  fputc_unlocked (aln->aln2[j], f);
-	}
-      fputc ('\n', f);
-      fputc ('\n', f);
-    }
-
-  fprintf (f, "\n\n");
-
-  free (matches);
-}
-

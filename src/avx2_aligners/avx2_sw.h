@@ -30,12 +30,12 @@
 #include "common/backtrack.h"
 #include "common/utils.h"
 
-alignment_f32*
+alignment*
 avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			 char* seqs2[8], float* subs_matrix, float gap_open,
 			 float gap_extend, int dup_strings);
 
-alignment_f32*
+alignment*
 avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], float match, float mismatch,
 			float gap_open, float gap_extend, int dup_strings);
