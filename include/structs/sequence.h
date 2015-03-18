@@ -18,35 +18,22 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef QUEUE_H_
-#define QUEUE_H_
+
+
+#ifndef SEQUENCE_H_
+#define SEQUENCE_H_
 
 typedef struct
 {
-  void* data;
-  void* next;
-} queue_node;
+  char* id;		//standard null-terminated C string
+  char* sequence;	//for performance, this might not be a standard null-terminated C string
+  int length;		//and this is its length
+} Sequence;
 
-typedef struct
-{
-  queue_node* front;
-  queue_node* back;
-  int count;
-} queue;
-
-queue_node*
-new_queue_node (void* data);
-
-queue*
-new_queue ();
+Sequence*
+Sequence_new (char* id, char* sequence, int length);
 
 void
-enqueue (queue* q, void* data);
+Sequence_free (Sequence* sequence);
 
-void*
-dequeue (queue* q);
-
-int
-queue_is_empty (queue* q);
-
-#endif /* QUEUE_H_ */
+#endif /* SEQUENCE_H_ */

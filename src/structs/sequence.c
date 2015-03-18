@@ -18,35 +18,36 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef QUEUE_H_
-#define QUEUE_H_
+#include <stdlib.h>
 
-typedef struct
+#include "structs/sequence.h"
+
+Sequence*
+Sequence_new (char* id, char* sequence, int length)
 {
-  void* data;
-  void* next;
-} queue_node;
-
-typedef struct
-{
-  queue_node* front;
-  queue_node* back;
-  int count;
-} queue;
-
-queue_node*
-new_queue_node (void* data);
-
-queue*
-new_queue ();
+  Sequence* seq = (Sequence*) malloc (sizeof(Sequence));
+  seq->id = id;
+  seq->sequence = sequence;
+  seq->length = length;
+  return seq;
+}
 
 void
-enqueue (queue* q, void* data);
+Sequence_free (Sequence* sequence)
+{
+  if (sequence != NULL){
+      free(sequence->id);
+      free(sequence->sequence);
+      free(sequence);
+  }
+}
 
-void*
-dequeue (queue* q);
+void
+Sequence_shallow_free (Sequence* sequence)
+{
+  if (sequence != NULL){
+      free(sequence->id);
+      free(sequence);
+  }
+}
 
-int
-queue_is_empty (queue* q);
-
-#endif /* QUEUE_H_ */

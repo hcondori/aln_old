@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "sequence.h"
+
 typedef enum
 {
   ALN_SCORE_INT8, ALN_SCORE_INT16, ALN_SCORE_INT32, ALN_SCORE_FLOAT32
@@ -39,12 +41,8 @@ typedef union
 
 typedef struct
 {
-  char* seq1_id;
-  char* seq2_id;
-  char* seq1;
-  char* seq2;
-  int seq1_len;
-  int seq2_len;
+  Sequence* seq1;
+  Sequence* seq2;
   char* aln1;
   char* aln2;
   int aln_len;

@@ -18,7 +18,6 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <stdlib.h>
 
 #include "structs/queue.h"
@@ -40,7 +39,7 @@ new_queue ()
 }
 
 void
-enqueue (queue* q, void* data)
+queue_push (queue* q, void* data)
 {
   queue_node* qn = new_queue_node (data);
   if (q->back == NULL)	//empty
@@ -74,4 +73,10 @@ dequeue (queue* q)
       q->count--;
       return data;
     }
+}
+
+int
+queue_is_empty (queue* q)
+{
+  return q->count == 0;
 }

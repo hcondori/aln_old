@@ -32,10 +32,8 @@
 void
 alignment_free (alignment* aln)
 {
-  free (aln->seq1_id);
-  free (aln->seq2_id);
-  free (aln->seq1);
-  free (aln->seq2);
+  Sequence_free(aln->seq1);
+  Sequence_free(aln->seq2);
   free (aln->aln1);
   free (aln->aln2);
 }
@@ -67,8 +65,8 @@ print_alignment (FILE *f, alignment* aln)
   gen_aln (aln->aln_len, aln->aln1, aln->aln2, matches, &gaps);
 
   fprintf (f, "#=======================================\n");
-  fprintf (f, "# 1: %s\n", aln->seq1_id);
-  fprintf (f, "# 2: %s\n", aln->seq2_id);
+  fprintf (f, "# 1: %s\n", aln->seq1->id);
+  fprintf (f, "# 2: %s\n", aln->seq2->id);
   fprintf (f, "%d\n", aln->aln_x);
   fprintf (f, "%d\n", aln->aln_y);
 
@@ -133,4 +131,13 @@ print_alignment (FILE *f, alignment* aln)
   fprintf (f, "\n\n");
 
   free (matches);
+}
+
+int
+alignment_is_null (alignment* aln)
+{
+  if (aln->seq1 == NULL || aln->seq1->length == 0 || aln->seq2 == NULL
+      || aln->seq2->length == 0)
+    return 0;
+  return 1;
 }
