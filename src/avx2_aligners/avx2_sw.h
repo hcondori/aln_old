@@ -18,26 +18,24 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef AVX2_SW_H_
 #define AVX2_SW_H_
 
-#include <assert.h>
-#include <float.h>
-#include <immintrin.h>
-
+#include "structs/sequence.h"
 #include "structs/alignment.h"
-#include "common/backtrack.h"
-#include "common/utils.h"
 
 alignment*
-avx2_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
-			 char* seqs2[8], float* subs_matrix, float gap_open,
+avx2_sw_f32_with_matrix (char** seqs1_id, char** seqs2_id, char** seqs1,
+			 char** seqs2, float* subs_matrix, float gap_open,
 			 float gap_extend, int dup_strings);
 
+void
+avx2_sw_f32_with_matrix_inplace (alignment** alignments, float* subs_matrix,
+				 float gap_open, float gap_extend);
+
 alignment*
-avx2_sw_f32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
-			char* seqs2[8], float match, float mismatch,
+avx2_sw_f32_with_match (char** seqs1_id, char** seqs2_id, char** seqs1,
+			char** seqs2, float match, float mismatch,
 			float gap_open, float gap_extend, int dup_strings);
 
 #endif /* AVX2_SW_H_ */

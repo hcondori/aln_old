@@ -18,24 +18,24 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "avx_sw.h"
-
 #include <immintrin.h>
 #include <stdio.h>
 #include <string.h>
 #include <float.h>
 
+#include "avx_sw.h"
 #include "common/backtrack.h"
 #include "common/utils.h"
+#include "common/avx_common.h"
 
 /*
  *Core function.
  *
  */
-void
-avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
+int*
+avx_fill_table_8_to_8_f32 (int* seqs1, int* seqs2, int x, int y,
 			   float* subs_matrix, float gap_open, float gap_extend,
-			   float max_score[8], int ipos[8], int jpos[8])
+			   float* max_score, int* ipos, int* jpos)
 {
   int mask = 0x7FFFFFFF;
   __m256 vmask = _mm256_castsi256_ps (_mm256_set1_epi32 (mask));
@@ -61,6 +61,7 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
 
   float* aF = (float*) aligned_alloc (32, 8 * y * sizeof(float));
   float* aH = (float*) aligned_alloc (32, 8 * y * sizeof(float));
+  int* bt_flag = (int*) malloc (x * y * sizeof(int));
   //if we are sure that sequences will be small, we keep them in the stack
   //float aF[8 * y] __attribute__((aligned(32)));
   //float aH[8 * y] __attribute__((aligned(32)));
@@ -163,94 +164,21 @@ avx_fill_table_8_to_8_f32 (int* bt_flag, int* seqs1, int* seqs2, int x, int y,
   _mm256_store_ps (max_score, max);
   free (aF);
   free (aH);
+  return bt_flag;
 }
 
-
-
 alignment*
-avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
-			char* seqs2[8], float* subs_matrix, float gap_open,
+avx_sw_f32_with_matrix (char** seqs1_id, char** seqs2_id, char** seqs1,
+			char** seqs2, float* subs_matrix, float gap_open,
 			float gap_extend, int dup_strings)
 {
-  int max_i;
-  int max_j;
+  SIMD_SW_8_TO_8(avx_fill_table_8_to_8_f32, float, ALN_FLOAT32)
+}
 
-  int lens_i[8];
-  int lens_j[8];
-
-  for (int i = 0; i < 8; i++)
-    lens_i[i] = strlen (seqs1[i]);
-
-  for (int j = 0; j < 8; j++)
-    lens_j[j] = strlen (seqs2[j]);
-
-  int* packed_seqs1 = avx_pack_8_seqs_with_len (seqs1, lens_i, &max_i);
-  int* packed_seqs2 = avx_pack_8_seqs_with_len (seqs2, lens_j, &max_j);
-
-  //int* flags = (int*) malloc ((max_i + 1) * (max_j + 1) * sizeof(int));
-  int* flags = (int*) malloc ((max_i + 1) * (max_j + 1) * sizeof(int));
-
-  float max_score[8] __attribute__((aligned(32)));
-  int pos_i[8] __attribute__((aligned(32)));
-  int pos_j[8] __attribute__((aligned(32)));
-
-  avx_fill_table_8_to_8_f32 (flags, packed_seqs1, packed_seqs2, max_i + 1,
-			     max_j + 1, subs_matrix, gap_open, gap_extend,
-			     max_score, pos_i, pos_j);
-
-  alignment* alignments = (alignment*) malloc (
-      8 * sizeof(alignment));
-
-  int x0, y0;
-
-  for (int i = 0; i < 8; i++)
-    {
-      //assert(max_i + max_j + 1 > 0);
-      char* m = (char*) calloc ((max_i + max_j + 1), sizeof(char));//worst-case length
-      char* n = (char*) calloc ((max_i + max_j + 1), sizeof(char));
-
-      //assert(m != NULL);
-      //assert(n != NULL);
-
-      sw_backtrack (i, flags, seqs1[i], seqs2[i], max_i + 1, max_j + 1, m, n,
-		    pos_i[i], pos_j[i], &x0, &y0);
-      //assert(strlen (m) == strlen (n));
-
-      int new_len = strlen (m) + 1;
-
-      //adjusting to actual sizes
-      m = (char*) realloc (m, new_len * sizeof(char));
-      n = (char*) realloc (n, new_len * sizeof(char));
-
-      if (dup_strings)
-	{
-	  alignments[i].seq1_id = strdup (seqs1_id[i]);
-	  alignments[i].seq2_id = strdup (seqs2_id[i]);
-	  alignments[i].seq1 = strdup (seqs1[i]);
-	  alignments[i].seq2 = strdup (seqs2[i]);
-	}
-      else
-	{
-	  alignments[i].seq1_id = seqs1_id[i];
-	  alignments[i].seq2_id = seqs2_id[i];
-	  alignments[i].seq1 = seqs1[i];
-	  alignments[i].seq2 = seqs2[i];
-	}
-      alignments[i].seq1_len = lens_i[i];
-      alignments[i].seq2_len = lens_j[i];
-      alignments[i].aln1 = m;
-      alignments[i].aln2 = n;
-      alignments[i].aln_len = strlen (m);
-      alignments[i].aln_x0 = x0;
-      alignments[i].aln_y0 = y0;
-      alignments[i].aln_x = pos_i[i];
-      alignments[i].aln_y = pos_j[i];
-      alignments[i].score.f32 = max_score[i];
-      alignments[i].type = ALN_SCORE_FLOAT32;
-    }
-
-  free (packed_seqs1);
-  free (packed_seqs2);
-  free (flags);
-  return alignments;
+void
+avx_sw_f32_with_matrix_inplace (alignment** alignments, float* subs_matrix,
+				float gap_open, float gap_extend)
+{
+  puts("You shouldnt be here!!!!!!!!!!!!");
+  SIMD_SW_8_TO_8_INPLACE(avx_fill_table_8_to_8_f32, float, ALN_FLOAT32)
 }

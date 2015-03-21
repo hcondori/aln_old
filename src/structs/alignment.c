@@ -32,10 +32,11 @@
 void
 alignment_free (alignment* aln)
 {
-  Sequence_free(aln->seq1);
-  Sequence_free(aln->seq2);
+  Sequence_free (aln->seq1);
+  Sequence_free (aln->seq2);
   free (aln->aln1);
   free (aln->aln2);
+  free (aln);
 }
 
 void
@@ -75,16 +76,16 @@ print_alignment (FILE *f, alignment* aln)
 	   ((float) gaps / (float) aln->aln_len) * 100);
   switch (aln->type)
     {
-    case ALN_SCORE_INT8:
+    case ALN_INT8:
       fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i8);
       break;
-    case ALN_SCORE_INT16:
+    case ALN_INT16:
       fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i16);
       break;
-    case ALN_SCORE_INT32:
+    case ALN_INT32:
       fprintf (f, "# Score:    %d.0\n\n\n", aln->score.i32);
       break;
-    case ALN_SCORE_FLOAT32:
+    case ALN_FLOAT32:
       fprintf (f, "# Score:    %0.1f\n\n\n", aln->score.f32);
       break;
     default:
@@ -136,8 +137,8 @@ print_alignment (FILE *f, alignment* aln)
 int
 alignment_is_null (alignment* aln)
 {
-  if (aln->seq1 == NULL || aln->seq1->length == 0 || aln->seq2 == NULL
-      || aln->seq2->length == 0)
-    return 0;
-  return 1;
+  if (aln == NULL || aln->seq1 == NULL || aln->seq1->length == 0
+      || aln->seq2 == NULL || aln->seq2->length == 0)
+    return 1;
+  return 0;
 }

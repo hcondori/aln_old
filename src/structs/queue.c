@@ -22,26 +22,26 @@
 
 #include "structs/queue.h"
 
-queue_node*
+Queue_node*
 new_queue_node (void* data)
 {
-  queue_node* qn = (queue_node*) malloc (sizeof(queue_node));
+  Queue_node* qn = (Queue_node*) malloc (sizeof(Queue_node));
   qn->data = data;
   qn->next = NULL;
   return qn;
 }
 
-queue*
-new_queue ()
+Queue*
+Queue_new ()
 {
-  queue* q = (queue*) calloc (1, sizeof(queue));
+  Queue* q = (Queue*) calloc (1, sizeof(Queue));
   return q;
 }
 
 void
-queue_push (queue* q, void* data)
+enqueue (Queue* q, void* data)
 {
-  queue_node* qn = new_queue_node (data);
+  Queue_node* qn = new_queue_node (data);
   if (q->back == NULL)	//empty
     {
       q->front = qn;
@@ -56,7 +56,7 @@ queue_push (queue* q, void* data)
 }
 
 void*
-dequeue (queue* q)
+dequeue (Queue* q)
 {
   if (q->front == NULL)	//empty
     {
@@ -65,7 +65,7 @@ dequeue (queue* q)
   else
     {
       void* data = q->front->data;
-      queue_node* qn = q->front;
+      Queue_node* qn = q->front;
       q->front = qn->next;
       if (q->back == qn)
 	q->back = NULL;
@@ -76,7 +76,16 @@ dequeue (queue* q)
 }
 
 int
-queue_is_empty (queue* q)
+Queue_is_empty (Queue* q)
 {
   return q->count == 0;
+}
+
+void
+Queue_free (Queue* q)
+{
+  if (q != NULL)
+    while (q->count > 0)
+      dequeue (q);
+  free (q);
 }

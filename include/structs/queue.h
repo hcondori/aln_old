@@ -25,28 +25,28 @@ typedef struct
 {
   void* data;
   void* next;
-} queue_node;
+} Queue_node;
 
 typedef struct
 {
-  queue_node* front;
-  queue_node* back;
+  Queue_node* front;
+  Queue_node* back;
   int count;
-} queue;
+} Queue;
 
-queue_node*
+Queue_node*
 new_queue_node (void* data);
 
-queue*
-new_queue ();
+Queue*
+Queue_new ();
 
 void
-enqueue (queue* q, void* data);
+enqueue (Queue* q, void* data);
 
 void*
-dequeue (queue* q);
+dequeue (Queue* q);
 
 int
-queue_is_empty (queue* q);
+Queue_is_empty (Queue* q);
 
 #endif /* QUEUE_H_ */

@@ -28,10 +28,10 @@
 #include <pthread.h>
 
 #include "structs/alignment.h"
-#include <avx2_aligners/avx2_sw.h>
-#include <avx2_aligners/avx2_swi.h>
-#include "common/backtrack.h"
 #include "avx_aligners/avx_sw.h"
+#include "avx2_aligners/avx2_sw.h"
+#include "avx2_aligners/avx2_swi.h"
+#include "common/backtrack.h"
 #include "common/utils.h"
 #include "structs/queue.h"
 
@@ -47,17 +47,26 @@
 #define MAX_BATCH_COUNT 512
 #define THRESHOLD_COUNT  (MAX_BATCH_COUNT / 4)
 
-queue* q;
+Queue* q_f32;
+Queue* q_i8;
+Queue* q_i16;
+Queue* q_i32;
+Queue* q_ready;
 
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t q_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
     pthread_cond_t not_empty_cond = PTHREAD_COND_INITIALIZER;
     pthread_cond_t need_refill_cond = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t ready_alignments_cond = PTHREAD_COND_INITIALIZER;
 
     int more_batches = 1;
     int do_int = 0;
     int do_float = 1;
+
+    int use_match = 0;
+    int use_matrix = 1;
 
     char* seqs1_fname = NULL;
     char* seqs2_fname = NULL;
@@ -73,10 +82,13 @@ float* sm;
 int* smi;
 
 //pointer to pairwise aligner
-alignment*
-(*pw_aligner) (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
-	       char* seqs2[8], float* subs_matrix, float gap_open,
-	       float gap_extend, int dup_strings);
+/*alignment*
+ (*pw_aligner) (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
+ char* seqs2[8], float* subs_matrix, float gap_open,
+ float gap_extend, int dup_strings);*/
+void
+(*pw_aligner) (alignment** alignments, float* subs_matrix, float gap_open,
+	       float gap_extend);
 
 typedef struct
 {
@@ -98,68 +110,92 @@ aln_batch_shallow_free (aln_batch* batch)
 }
 
 void*
-consumer (void* ptr)
+worker (void* ptr)
 {
-  alignment* alns;
+  Queue* current_queue = NULL;
+  int batch_size;
 
-  aln_batch* batch = NULL;
+  if (do_float)
+    {
+      current_queue = q_f32;
+      batch_size = 8;		//we must fetch 8 alignments.
+    }
+  else
+    {
+      current_queue = q_i8;
+      batch_size = 32;		//we must fetch 32 alignments at the beginning.
+    }
+
+  alignment* alns[8];
+  alignment* aln = NULL;
 
   while (1)
     {
       pthread_mutex_lock (&queue_mutex);
-      while ((batch = dequeue (q)) == NULL)
+
+      for (int i = 0; i < 8; i++)
 	{
-	  pthread_cond_wait (&not_empty_cond, &queue_mutex);
+	  while ((aln = dequeue (q_f32)) == NULL)
+	    pthread_cond_wait (&not_empty_cond, &queue_mutex);
+	  alns[i] = aln;
+	  //puts(aln->seq2->sequence);
 	}
-      //pthread_cond_signal (&need_refill_cond);
       pthread_mutex_unlock (&queue_mutex);
 
-      if (batch->pair_count == 0)	//we are done
+      if (alignment_is_null (alns[0]))
 	{
-	  pthread_mutex_lock (&queue_mutex);
-	  enqueue (q, batch);	//reenque it for other processes to see it
-	  pthread_mutex_unlock (&queue_mutex);
-	  break;
+	  puts ("Done XD");
+	  pthread_exit (0);
 	}
 
       if (do_float)
 	{
-	  alns = pw_aligner (batch->seqs1_ids, batch->seqs2_ids, batch->seqs1,
-			     batch->seqs2, sm, gap_open, gap_extend, 0);
-	  /*alns = avx2_sw_f32_with_match (batch->seqs1_ids, batch->seqs2_ids,
-	   batch->seqs1, batch->seqs2, 5, -4,
-	   gap_open, gap_extend, 0);*/
-
-	  for (int i = 0; i < batch->pair_count; i++)
-	    {
-	      pthread_mutex_lock (&print_mutex);
-	      print_alignment (out_file, &alns[i]);
-	      pthread_mutex_unlock (&print_mutex);
-	    }
+	  pw_aligner (alns, sm, gap_open, gap_extend);
+	  pthread_mutex_lock (&q_ready_mutex);
 	  for (int i = 0; i < 8; i++)
-	    alignment_free (&alns[i]);
-	  free (alns);
+	    enqueue (q_ready, alns[i]);	//some elements might be null in the last batch
+	  pthread_cond_signal (&ready_alignments_cond);
+	  pthread_mutex_unlock (&q_ready_mutex);
 	}
       else
 	{
-	  alns = avx2_sw_i32_with_matrix (batch->seqs1_ids, batch->seqs2_ids,
-					  batch->seqs1, batch->seqs2, smi,
-					  gap_open_i, gap_extend_i, 0);
+	  /*alns = avx2_sw_i32_with_matrix (batch->seqs1_ids, batch->seqs2_ids,
+	   batch->seqs1, batch->seqs2, smi,
+	   gap_open_i, gap_extend_i, 0);*/
 	  /*i32_alns = avx2_sw_i32_with_match (batch->seqs1_ids, batch->seqs2_ids,
 	   batch->seqs1, batch->seqs2, 5, -4,
 	   gap_open_i, gap_extend_i, 0);*/
-	  for (int i = 0; i < batch->pair_count; i++)
-	    {
-	      pthread_mutex_lock (&print_mutex);
-	      print_alignment (out_file, &alns[i]);
-	      pthread_mutex_unlock (&print_mutex);
-	    }
-	  for (int i = 0; i < 8; i++)
-	    alignment_free (&alns[i]);
-	  free (alns);
 	}
-      aln_batch_shallow_free (batch);
-      batch = NULL;
+    }
+
+  pthread_exit (0);
+}
+
+/*
+ * Dedicated thread for generating output
+ */
+void*
+print_worker (void* ptr)
+{
+  alignment* aln;
+
+  while (1)
+    {
+      pthread_mutex_lock (&q_ready_mutex);
+
+      while ((aln = dequeue (q_ready)) == NULL)
+	pthread_cond_wait (&ready_alignments_cond, &q_ready_mutex);
+
+      if (alignment_is_null (aln))
+	{
+	  pthread_mutex_unlock (&q_ready_mutex);
+	  pthread_exit (0);
+	}
+
+      pthread_mutex_unlock (&q_ready_mutex);
+
+      print_alignment (out_file, aln);
+      alignment_free (aln);
     }
   pthread_exit (0);
 }
@@ -174,7 +210,7 @@ print_help ()
  * FASTA parser
  */
 int
-get_sequences (FILE* f, char** seqs_ids, char** seqs, int* state, char* ch)
+load_sequence (FILE* f, char** seqs_ids, char** seqs, int* state, char* ch)
 {
   int seq_size = 128;
   char* seq_buffer = (char*) malloc (seq_size * sizeof(char));
@@ -186,7 +222,7 @@ get_sequences (FILE* f, char** seqs_ids, char** seqs, int* state, char* ch)
 
   //*state = 0;   //0: start, 1: seq header, 2: seq id, 3: seq
 
-  while (seqs_n < 8 && (*ch = fgetc (f)) != EOF)
+  while (seqs_n < 1 && (*ch = fgetc (f)) != EOF)
     {
       switch (*state)
 	{
@@ -260,10 +296,10 @@ get_sequences (FILE* f, char** seqs_ids, char** seqs, int* state, char* ch)
     }
 
   //init empty chars
-  for (int i = seqs_n; i < 8; i++)
+  for (int i = seqs_n; i < 1; i++)
     {
-      seqs_ids[i] = strdup ("");
-      seqs[i] = strdup ("");
+      seqs_ids[i] = NULL;
+      seqs[i] = NULL;
     }
 
   //if (*ch != EOF)
@@ -413,19 +449,19 @@ main (int argc, char** argv)
   int has_sse41 = __builtin_cpu_supports ("sse4.1");
   int has_avx = __builtin_cpu_supports ("avx");
   int has_avx2 = __builtin_cpu_supports ("avx2");
-  //has_avx2 = 0;
+  //has_avx = 0;
 
   if (platform == 0)
     {
       if (has_avx2)
 	{
 	  printf (" * AVX2 support detected.\n");
-	  pw_aligner = &avx2_sw_f32_with_matrix;
+	  pw_aligner = &avx2_sw_f32_with_matrix_inplace;
 	}
       else if (has_avx)
 	{
 	  printf (" * AVX support detected.\n");
-	  pw_aligner = &avx_sw_f32_with_matrix;
+	  pw_aligner = &avx_sw_f32_with_matrix_inplace;
 	}
       else if (has_sse41)
 	{
@@ -476,14 +512,14 @@ main (int argc, char** argv)
 	}
     }
 
-  char* seqs1[8];
-  char* seqs2[8];
+  char* seq1_sequence;
+  char* seq2_sequence;
 
-  char* seqs1_ids[8];
-  char* seqs2_ids[8];
+  char* seq1_id;
+  char* seq2_id;
 
-  int seqs1_n;
-  int seqs2_n;
+  int seq1_n = 0;
+  int seq2_n = 0;
 
   int pair_count = 0;
 
@@ -492,68 +528,89 @@ main (int argc, char** argv)
   char ch1;
   char ch2;
 
-  q = new_queue ();
-  aln_batch* batch;
+  q_f32 = Queue_new ();
+  q_i8 = Queue_new ();
+  q_i16 = Queue_new ();
+  q_i32 = Queue_new ();
+  q_ready = Queue_new ();
 
   pthread_t consumers[jobs];
+  pthread_t print_consumer;
+
   for (int i = 0; i < jobs; i++)
-    {
-      pthread_create (&consumers[i], NULL, consumer, NULL);
-    }
+    pthread_create (&consumers[i], NULL, worker, NULL);
+  pthread_create (&print_consumer, NULL, print_worker, NULL);
+
+  alignment* aln;
+  Sequence* seq1;
+  Sequence* seq2;
 
   do
     {
-      batch = (aln_batch*) malloc (sizeof(aln_batch));
-      batch->seqs1_ids = (char**) malloc (8 * sizeof(char*));
-      batch->seqs2_ids = (char**) malloc (8 * sizeof(char*));
-      batch->seqs1 = (char**) malloc (8 * sizeof(char*));
-      batch->seqs2 = (char**) malloc (8 * sizeof(char*));
-      seqs1_n = get_sequences (seqs1_file, batch->seqs1_ids, batch->seqs1,
-			       &state1, &ch1);
-      seqs2_n = get_sequences (seqs2_file, batch->seqs2_ids, batch->seqs2,
-			       &state2, &ch2);
-      batch->pair_count = MIN(seqs1_n, seqs2_n);
-
+      aln = (alignment*) malloc (sizeof(alignment));
+      seq1_n = load_sequence (seqs1_file, &seq1_id, &seq1_sequence, &state1,
+			      &ch1);
+      seq2_n = load_sequence (seqs2_file, &seq2_id, &seq2_sequence, &state2,
+			      &ch2);
+      seq1 = Sequence_new (seq1_id, seq1_sequence, strlen (seq1_sequence));
+      seq2 = Sequence_new (seq2_id, seq2_sequence, strlen (seq2_sequence));
+      aln->seq1 = seq1;
+      aln->seq2 = seq2;
       pthread_mutex_lock (&queue_mutex);
-      enqueue (q, batch);
-      pthread_cond_signal (&not_empty_cond);
+      enqueue (q_f32, aln);
+      if ((pair_count + 1) % 8 == 0)
+	pthread_cond_signal (&not_empty_cond);
       pthread_mutex_unlock (&queue_mutex);
-
-      pair_count += MIN(seqs1_n, seqs2_n);
+      pair_count += MIN(seq1_n, seq2_n);
     }
-  while (seqs1_n > 0 && seqs2_n > 0);
+  while (seq1_n && seq2_n);
+
+  //centinel
+  alignment* centinel = (alignment*) calloc (1, sizeof(alignment));
 
   //no more work to do :)
   pthread_mutex_lock (&queue_mutex);
+  for (int i = 0; i < (jobs + 1) * 8; i++)
+    {
+      enqueue (q_f32, centinel);
+    }
   //more_batches = 0;
   pthread_cond_broadcast (&not_empty_cond);
   pthread_mutex_unlock (&queue_mutex);
 
   for (int i = 0; i < jobs; i++)
-    {
-      pthread_join (consumers[i], NULL);
-    }
+    pthread_join (consumers[i], NULL);
+  pthread_join (print_consumer, NULL);
 
-  free (q);
-  fclose (seqs1_file);
-  fclose (seqs2_file);
+  free (q_i8);
+  free (q_i16);
+  free (q_i32);
+  free (q_f32);
+  free (q_ready);
+
+  if (seqs1_file != NULL)
+    fclose (seqs1_file);
+  if (seqs2_file != NULL)
+    fclose (seqs2_file);
 
   if (out_file != stdout)
     fclose (out_file);
 
-  if (seqs1_n != seqs2_n)
+  if (seq1_n != seq2_n)
     {
-      printf ("1: %d\n", seqs1_n);
-      printf ("2: %d\n", seqs2_n);
+      printf ("1: %d\n", seq1_n);
+      printf ("2: %d\n", seq2_n);
       printf ("Warning: sequence count do not match in both files.\n");
     }
 
   printf ("%d alignments have been performed.\n", pair_count);
 
   pthread_mutex_destroy (&queue_mutex);
+  pthread_mutex_destroy (&q_ready_mutex);
   pthread_mutex_destroy (&print_mutex);
   pthread_cond_destroy (&not_empty_cond);
   pthread_cond_destroy (&need_refill_cond);
+  pthread_cond_destroy (&ready_alignments_cond);
 
   return 0;
 }

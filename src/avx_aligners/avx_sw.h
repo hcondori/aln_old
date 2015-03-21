@@ -18,24 +18,23 @@
  along with ALN.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SW_H_
-#define SW_H_
+#ifndef AVX_SW_H_
+#define AVX_SW_H_
 
+#include "structs/sequence.h"
 #include "structs/alignment.h"
-
-float*
-prepare_table (int x, int y, float o, float e);
-
-float*
-extract_table (float* table, int x, int y, int n);
 
 alignment*
 sw_1_to_1_f32_mith_matrix (char* seq1, char* seq2, float* subs_matrix,
 			   float gap_open, float gap_extend);
 
+void
+avx_sw_f32_with_matrix_inplace (alignment** alignments, float* subs_matrix,
+				float gap_open, float gap_extend);
+
 alignment*
-avx_sw_f32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char** seqs1,
+avx_sw_f32_with_matrix (char** seqs1_id, char** seqs2_id, char** seqs1,
 			char** seqs2, float* subs_matrix, float gap_open,
 			float gap_extend, int dup_strings);
 
-#endif /* SW_H_ */
+#endif /* AVX_SW_H_ */

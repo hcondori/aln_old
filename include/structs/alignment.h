@@ -28,8 +28,8 @@
 
 typedef enum
 {
-  ALN_SCORE_INT8, ALN_SCORE_INT16, ALN_SCORE_INT32, ALN_SCORE_FLOAT32
-} aln_score_type;
+  ALN_INT8, ALN_INT16, ALN_INT32, ALN_FLOAT32
+} aln_type;
 
 typedef union
 {
@@ -51,7 +51,7 @@ typedef struct
   int aln_x;
   int aln_y;
   aln_score score;
-  aln_score_type type;
+  aln_type type;
 } alignment;
 
 void
@@ -59,5 +59,8 @@ alignment_free (alignment* aln);
 
 void
 print_alignment (FILE *f, alignment* aln);
+
+int
+alignment_is_null (alignment* aln);
 
 #endif /* ALIGNMENT_H_ */

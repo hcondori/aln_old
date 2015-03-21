@@ -28,6 +28,7 @@
 #include "structs/alignment.h"
 #include "common/backtrack.h"
 #include "common/utils.h"
+#include "common/avx_common.h"
 
 int*
 avx2_fill_table_8_to_8_i32 (int* seqs1, int* seqs2, int x, int y,
@@ -268,91 +269,15 @@ avx2_fill_table_8_to_8_i32_with_match (int* seqs1, int* seqs2, int x, int y,
  *
  */
 alignment*
-avx2_sw_i32_with_matrix (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
-			 char* seqs2[8], int* subs_matrix, int gap_open,
+avx2_sw_i32_with_matrix (char** seqs1_id, char** seqs2_id, char** seqs1,
+			 char** seqs2, int* subs_matrix, int gap_open,
 			 int gap_extend, int dup_strings)
 {
-  int max_i;
-  int max_j;
-
-  int lens_i[8];
-  int lens_j[8];
-
-  for (int i = 0; i < 8; i++)
-    lens_i[i] = strlen (seqs1[i]);
-
-  for (int j = 0; j < 8; j++)
-    lens_j[j] = strlen (seqs2[j]);
-
-  int* packed_seqs1 = avx_pack_8_seqs_with_len (seqs1, lens_i, &max_i);
-  int* packed_seqs2 = avx_pack_8_seqs_with_len (seqs2, lens_j, &max_j);
-
-  int max_score[8] __attribute__((aligned(32)));
-  int pos_i[8] __attribute__((aligned(32)));
-  int pos_j[8] __attribute__((aligned(32)));
-
-  int* flags = avx2_fill_table_8_to_8_i32 (packed_seqs1, packed_seqs2,
-					   max_i + 1, max_j + 1, subs_matrix,
-					   gap_open, gap_extend, max_score,
-					   pos_i, pos_j);
-
-  alignment* alignments = (alignment*) malloc (
-      8 * sizeof(alignment));
-
-  int x0, y0;
-
-  for (int i = 0; i < 8; i++)
-    {
-      //assert(max_i + max_j + 1 > 0);
-      char* m = (char*) calloc ((max_i + max_j + 1), sizeof(char)); //worst-case length
-      char* n = (char*) calloc ((max_i + max_j + 1), sizeof(char));
-
-      //assert(m != NULL);
-      //assert(n != NULL);
-
-      sw_backtrack (i, flags, seqs1[i], seqs2[i], max_i + 1, max_j + 1, m, n,
-		    pos_i[i], pos_j[i], &x0, &y0);
-      //assert(strlen (m) == strlen (n));
-
-      int new_len = strlen (m) + 1;
-
-      //adjusting to actual sizes
-      m = (char*) realloc (m, new_len * sizeof(char));
-      n = (char*) realloc (n, new_len * sizeof(char));
-
-      if (dup_strings)
-	{
-	  alignments[i].seq1_id = strdup (seqs1_id[i]);
-	  alignments[i].seq2_id = strdup (seqs2_id[i]);
-	  alignments[i].seq1 = strdup (seqs1[i]);
-	  alignments[i].seq2 = strdup (seqs2[i]);
-	}
-      else
-	{
-	  alignments[i].seq1_id = seqs1_id[i];
-	  alignments[i].seq2_id = seqs2_id[i];
-	  alignments[i].seq1 = seqs1[i];
-	  alignments[i].seq2 = seqs2[i];
-	}
-      alignments[i].seq1_len = lens_i[i];
-      alignments[i].seq2_len = lens_j[i];
-      alignments[i].aln1 = m;
-      alignments[i].aln2 = n;
-      alignments[i].aln_len = strlen (m);
-      alignments[i].aln_x0 = x0;
-      alignments[i].aln_y0 = y0;
-      alignments[i].aln_x = pos_i[i];
-      alignments[i].aln_y = pos_j[i];
-      alignments[i].score.i32 = max_score[i];
-      alignments[i].type= ALN_SCORE_INT32;
-    }
-
-  free (packed_seqs1);
-  free (packed_seqs2);
-  free (flags);
-  return alignments;
+  SIMD_SW_8_TO_8(avx2_fill_table_8_to_8_i32, int, ALN_INT32)
 }
 
+
+/*
 alignment*
 avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
 			char* seqs2[8], int match, int mismatch, int gap_open,
@@ -440,3 +365,4 @@ avx2_sw_i32_with_match (char* seqs1_id[8], char* seqs2_id[8], char* seqs1[8],
   free (flags);
   return alignments;
 }
+*/
